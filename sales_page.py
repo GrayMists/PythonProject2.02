@@ -47,7 +47,7 @@ def fetch_all_sales_data(territory: str, line: str, months: list) -> pd.DataFram
 
 def show():
     """Відображає сторінку "Продажі" з відфільтрованими даними та вкладками."""
-    st.set_page_config(page_title="Аналіз Продажів", layout="wide")
+    st.set_page_config(page_title="Аналіз Продажів", layout="centered")
 
     st.title("📊 Аналіз продажів")
     st.write(
