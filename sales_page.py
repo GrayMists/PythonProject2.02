@@ -94,18 +94,126 @@ def show():
                 if selected_street != "Всі": df_display = df_display[df_display['street'] == selected_street]
 
                 st.subheader("Ключові показники")
-                kpi1, kpi2, kpi3 = st.columns(3)
                 total_quantity = int(pd.to_numeric(df_display['quantity'], errors='coerce').sum())
-                unique_clients = df_display['client'].nunique()
-                average_quantity = round(pd.to_numeric(df_display['quantity'], errors='coerce').mean(),
-                                         2) if not df_display.empty else 0
-                kpi1.metric(label="Загальна кількість продажів", value=total_quantity)
-                kpi2.metric(label="Кількість унікальних клієнтів", value=unique_clients)
-                kpi3.metric(label="Середня кількість в чеку", value=average_quantity)
+                top_products = df_display.groupby('product_name')['quantity'].sum().sort_values(ascending=False).head(5)
+                rev_top_products = df_display.groupby('product_name')['quantity'].sum().sort_values(ascending=True).head(5)
+                # Розрахунок нових метрик
+                unique_products = df_display['product_name'].nunique()
+                # Формуємо об'єднану адресу
+                df_display['full_address'] = (
+                    df_display['city'].astype(str).fillna('') + ", " +
+                    df_display['street'].astype(str).fillna('') + ", " +
+                    df_display['house_number'].astype(str).fillna('')
+                ).str.strip(', ')
+                unique_clients = df_display['full_address'].nunique()
+                avg_quantity_per_client = total_quantity / unique_clients if unique_clients else 0
+                # Додана метрика: частка ТОП-5 продуктів у загальному обсязі
+                top5_total = top_products.sum()
+                top5_share = top5_total / total_quantity * 100 if total_quantity else 0
+                # KPI-картки в два ряди по 3 колонки
+                kpi_row1 = st.columns(3)
+                kpi_row2 = st.columns(3)
+
+                with kpi_row1[0]:
+                    st.markdown(f"""
+                        <div style="height: 140px; margin: 10px; padding: 1rem; border-radius: 10px; background-color: #f4f4f4; text-align: center; border: 1px solid #ddd; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 14px; color: #555;">Загальна кількість проданих упаковок</div>
+                            <div style="font-size: 32px; font-weight: bold; color: #f45b00;">{total_quantity:,}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                with kpi_row1[1]:
+                    st.markdown(f"""
+                        <div style="height: 140px; margin: 10px; padding: 1rem; border-radius: 10px; background-color: #f4f4f4; text-align: center; border: 1px solid #ddd; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 14px; color: #555;">Унікальні продукти</div>
+                            <div style="font-size: 28px; font-weight: bold; color: #3366cc;">{unique_products}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                with kpi_row1[2]:
+                    st.markdown(f"""
+                        <div style="height: 140px; margin: 10px; padding: 1rem; border-radius: 10px; background-color: #f4f4f4; text-align: center; border: 1px solid #ddd; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 14px; color: #555;">Унікальні клієнти</div>
+                            <div style="font-size: 28px; font-weight: bold; color: #3366cc;">{unique_clients}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                with kpi_row2[0]:
+                    st.markdown(f"""
+                        <div style="height: 140px; margin: 10px; padding: 1rem; border-radius: 10px; background-color: #f4f4f4; text-align: center; border: 1px solid #ddd; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 14px; color: #555;">Середня кількість на клієнта</div>
+                            <div style="font-size: 28px; font-weight: bold; color: #3366cc;">{avg_quantity_per_client:.1f}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                with kpi_row2[1]:
+                    st.markdown(f"""
+                        <div style="height: 140px; margin: 10px; padding: 1rem; border-radius: 10px; background-color: #f4f4f4; text-align: center; border: 1px solid #ddd; display: flex; flex-direction: column; justify-content: center;">
+                            <div style="font-size: 14px; color: #555;">Частка ТОП-5 продуктів у загальному обсязі (%)</div>
+                            <div style="font-size: 28px; font-weight: bold; color: #3366cc;">{top5_share:.1f}%</div>
+                        </div>
+                    """, unsafe_allow_html=True)
+
+                with kpi_row2[2]:
+                    # Можна залишити порожнім або додати іншу метрику в майбутньому
+                    st.markdown("")
+
+                # Таблиці ТОП-5 винесені в окремий рядок з двома колонками
+                kpi_row3 = st.columns(2)
+
+                with kpi_row3[0]:
+                    st.markdown("**ТОП-5 найбільш продаваних продуктів:**")
+                    st.dataframe(top_products.reset_index().rename(columns={'quantity': 'Кількість'}), hide_index=True)
+
+                with kpi_row3[1]:
+                    st.markdown("**ТОП-5 найменш продаваних продуктів:**")
+                    st.dataframe(rev_top_products.reset_index().rename(columns={'quantity': 'Кількість'}), hide_index=True)
 
                 st.markdown("---")
                 st.subheader("Деталізовані дані")
-                st.dataframe(df_display)
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Зведена таблиця: Міста**")
+                    st.dataframe(
+                        df_display.groupby('city', as_index=False)['quantity']
+                        .sum()
+                        .sort_values(by='quantity', ascending=False)
+                        .rename(columns={'city': 'Місто', 'quantity': 'Кількість'}),
+                        hide_index=True
+                    )
+                with col2:
+                    st.markdown("**Зведена таблиця: Вулиці та Продукти**")
+                    st.dataframe(
+                        df_display.groupby('street', as_index=False)['quantity']
+                        .sum()
+                        .sort_values(by='quantity', ascending=False)
+                        .rename(columns={'street': 'Вулиця', 'quantity': 'Кількість'}),
+                        hide_index=True
+                    )
+                st.markdown("**Зведена таблиця: Продукти**")
+                st.dataframe(
+                    df_display.groupby('product_name', as_index=False)['quantity']
+                        .sum()
+                        .sort_values(by='quantity', ascending=False)
+                        .rename(columns={'product_name': 'Продукт', 'quantity': 'Кількість'}),
+                    hide_index=True
+                )
+
+                # --- Додаємо зведену таблицю по місту × продукту ---
+                st.subheader("Зведена таблиця: Міста та Продукти")
+                city_product_pivot = df_display.pivot_table(
+                    index='city',
+                    columns='product_name',
+                    values='quantity',
+                    aggfunc='sum',
+                    fill_value=0
+                )
+
+                def highlight_positive(val):
+                    return 'background-color: #355E3B' if val > 0 else ''
+
+                st.dataframe(city_product_pivot.style.applymap(highlight_positive))
+
 
 
         else:
@@ -227,4 +335,3 @@ def show():
                 st.info("Натисніть 'Застосувати', щоб побачити деталізацію.")
         else:
             st.info("Спочатку отримайте дані, використовуючи фільтри на першій вкладці.")
-
