@@ -324,7 +324,7 @@ def show():
                                 )
 
                                 def highlight_positive(val):
-                                    return 'background-color: lightgreen' if val > 0 else ''
+                                    return 'background-color: #355E3B' if val > 0 else ''
 
                                 styled_table = pivot_table.style.applymap(highlight_positive)
 
