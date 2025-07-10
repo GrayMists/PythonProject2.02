@@ -75,5 +75,4 @@ with st.sidebar:
 if selected_page == "Аналіз продажів":
     sales_page.show()
 elif selected_page == "Завантаження даних":
-    st.title("Сторінка завантаження даних")
-    st.info("Ця частина додатку в розробці.")
+    upload_page.show()

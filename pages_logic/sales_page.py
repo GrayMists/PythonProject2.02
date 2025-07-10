@@ -26,61 +26,84 @@ def show():
 
     # --- ВКЛАДКА 1: Загальний огляд ---
     with tab1:
-        st.header("Загальний огляд продажів")
-        st.write("Всі днаі динамічно змінюються згідно обраних фільтрів")
-
-        # 1. Фільтруємо дані для цієї вкладки
-        df_decade_30 = df_full[df_full['decade'] == "30"].copy()
-        if df_decade_30.empty:
-            st.warning("У завантажених даних немає продажів за обраний період.")
+        # --- ОНОВЛЕНА ЛОГІКА: Динамічний вибір максимальної декади ---
+        if 'decade' not in df_full.columns or df_full['decade'].dropna().empty:
+            st.warning("В завантажених даних відсутня інформація про декади.")
+            st.header("Загальний огляд продажів")
+            st.info("Неможливо визначити останню декаду для аналізу.")
         else:
-            # 2. Відображаємо та застосовуємо локальні фільтри
-            selected_city, selected_street = ui_components.render_local_filters(df_decade_30, key_prefix="tab1")
-            df_display = ui_components.apply_filters(df_decade_30, selected_city, selected_street)
+            # Конвертуємо декади в числа, щоб знайти максимум, ігноруючи можливі помилки
+            available_decades = pd.to_numeric(df_full['decade'], errors='coerce').dropna().unique()
 
-            # 3. Розраховуємо KPI
-            kpis = data_processing.calculate_main_kpis(df_display)
+            if len(available_decades) == 0:
+                st.warning("Не вдалося визначити доступні декади в даних.")
+            else:
+                # Знаходимо максимальну декаду і динамічно оновлюємо заголовок
+                max_decade = int(available_decades.max())
+                st.header(f"Загальний огляд продажів за останню декаду ({max_decade})")
 
-            # 4. Відображаємо KPI
-            st.subheader("Ключові показники")
-            kpi_cols = st.columns(4)
-            with kpi_cols[0]:
-                ui_components.display_kpi_card("Загальна кількість", f"{kpis['total_quantity']:,}")
-            with kpi_cols[1]:
-                ui_components.display_kpi_card("Унікальні продукти", f"{kpis['unique_products']:,}")
-            with kpi_cols[2]:
-                ui_components.display_kpi_card("Унікальні клієнти", f"{kpis['unique_clients']:,}")
-            with kpi_cols[3]:
-                ui_components.display_kpi_card("Частка ТОП-5 (%)", f"{kpis['top5_share']:.1f}%")
+                # 1. Фільтруємо дані для цієї вкладки по максимальній декаді
+                df_latest_decade = df_full[df_full['decade'] == str(max_decade)].copy()
 
-            st.markdown("---")
+                if df_latest_decade.empty:
+                    st.warning(f"Не знайдено даних для {max_decade}-ї декади.")
+                else:
+                    # 2. Відображаємо та застосовуємо локальні фільтри
+                    selected_city, selected_street = ui_components.render_local_filters(df_latest_decade,
+                                                                                        key_prefix="tab1")
+                    df_display = ui_components.apply_filters(df_latest_decade, selected_city, selected_street)
 
-            # 5. Відображаємо візуалізації
-            visualizations.plot_sales_dynamics(df_display)
-            visualizations.plot_top_products_bar_chart(kpis['top_products'], kpis['rev_top_products'])
+                    # 3. Розраховуємо KPI
+                    kpis = data_processing.calculate_main_kpis(df_display)
 
-            # 6. Додаємо зведену таблицю та теплову карту
-            st.subheader("Зведена таблиця: Міста та Продукти")
-            df_display = df_display.rename(columns={'city': 'Місто'})
+                    # 4. Відображаємо KPI
+                    st.subheader("Ключові показники")
+                    kpi_cols = st.columns(4)
+                    with kpi_cols[0]:
+                        ui_components.display_kpi_card("Загальна кількість", f"{kpis['total_quantity']:,}")
+                    with kpi_cols[1]:
+                        ui_components.display_kpi_card("Унікальні продукти", f"{kpis['unique_products']:,}")
+                    with kpi_cols[2]:
+                        ui_components.display_kpi_card("Унікальні клієнти", f"{kpis['unique_clients']:,}")
+                    with kpi_cols[3]:
+                        ui_components.display_kpi_card("Частка ТОП-5 (%)", f"{kpis['top5_share']:.1f}%")
 
-            city_product_pivot = df_display.pivot_table(
-                index='Місто',
-                columns='product_name',
-                values='quantity',
-                aggfunc='sum',
-                fill_value=0
-            )
-            city_product_pivot = city_product_pivot.loc[city_product_pivot.sum(axis=1).sort_values(ascending=False).index]
+                    st.markdown("---")
 
-            # Функція для підсвічування всіх позитивних значень вказаним кольором
-            def highlight_positive_custom(val):
-                color = '#4B6F44' if val > 0 else ''  # Темно-зелений для позитивних значень
-                return f'background-color: {color}'
+                    # 5. Відображаємо візуалізації
+                    visualizations.plot_sales_dynamics(df_display)
 
-            st.dataframe(city_product_pivot.style.applymap(highlight_positive_custom).format('{:.0f}'))
+                    top5_names = kpis['top_products'].index.tolist()
+                    bottom5_names = kpis['rev_top_products'].index.tolist()
 
-            with st.expander("Показати теплову карту продажів"):
-                visualizations.plot_city_product_heatmap(df_display)
+                    df_top5 = df_display[df_display['product_name'].isin(top5_names)].copy()
+                    df_bottom5 = df_display[df_display['product_name'].isin(bottom5_names)].copy()
+
+                    visualizations.plot_top_products_bar_chart(df_top5, df_bottom5)
+
+                    # 6. Додаємо зведену таблицю та теплову карту
+                    st.subheader("Зведена таблиця: Міста та Продукти")
+
+                    city_product_pivot = df_display.pivot_table(
+                        index='city',
+                        columns='product_name',
+                        values='quantity',
+                        aggfunc='sum',
+                        fill_value=0
+                    )
+
+                    if not city_product_pivot.empty:
+                        city_product_pivot = city_product_pivot.loc[
+                            city_product_pivot.sum(axis=1).sort_values(ascending=False).index]
+
+                    def highlight_positive_custom(val):
+                        color = '#4B6F44' if val > 0 else ''
+                        return f'background-color: {color}'
+
+                    st.dataframe(city_product_pivot.style.applymap(highlight_positive_custom).format('{:.0f}'))
+
+                    with st.expander("Показати теплову карту продажів"):
+                        visualizations.plot_city_product_heatmap(city_product_pivot)
 
     # --- ВКЛАДКА 2: Деталізація по адресах ---
     with tab2:
@@ -97,33 +120,48 @@ def show():
         if df_actual_sales.empty:
             st.warning("За обраними фільтрами не знайдено даних для розрахунку.")
         else:
-            # 3. Групуємо по адресі для відображення в експандерах
+            def highlight_positive_dark_green(val):
+                color = '#4B6F44' if val > 0 else ''
+                return f'background-color: {color}'
+
+            st.subheader("Загальна зведена таблиця по фактичних продажах")
+            st.markdown("Ця таблиця показує сумарні фактичні продажі за всіма відфільтрованими адресами.")
+
+            summary_pivot_table = df_actual_sales.pivot_table(
+                index='product_name',
+                columns=['year', 'month', 'decade'],
+                values='actual_quantity',
+                aggfunc='sum',
+                fill_value=0
+            )
+
+            st.dataframe(summary_pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))
+            st.markdown("---")
+
             grouped = df_actual_sales.groupby('full_address')
-            st.info(f"Знайдено {grouped.ngroups} унікальних адрес з фактичними продажами.")
+            st.info(
+                f"Знайдено {grouped.ngroups} унікальних адрес з фактичними продажами. Натисніть на адресу, щоб побачити деталі.")
 
             for full_address, group in grouped:
-                # Отримуємо імена клієнтів зі словника
-                client_names = address_client_map.get(full_address, "Невідома Аптека")
-                expander_title = f"**{full_address}** (Аптека: *{client_names}*)"
+                client_names = address_client_map.get(full_address, "Невідомий клієнт")
+                expander_title = f"**{full_address}** (Клієнти: *{client_names}*)"
 
                 with st.expander(expander_title):
                     total_actual_quantity = group['actual_quantity'].sum()
                     st.metric("Всього фактичних продажів за адресою:", f"{total_actual_quantity:,}")
 
-                    # Відображаємо унікальні адреси доставки
-                    st.markdown("<span style='font-size: 0.9em'><strong>Точки доставки за цією адресою:</strong></span>", unsafe_allow_html=True)
+                    st.markdown("**Точки доставки за цією адресою:**")
                     original_rows = df_display_client[df_display_client['full_address'] == full_address]
                     unique_delivery_addresses = original_rows['delivery_address'].dropna().unique()
 
                     if len(unique_delivery_addresses) > 0:
                         for addr in sorted(unique_delivery_addresses):
-                            st.markdown(f"<span style='font-size: 0.8em'>{addr}</span>", unsafe_allow_html=True)
+                            st.markdown(f"- {addr}")
                     else:
                         st.markdown("- *Адреси доставки не вказано*")
 
                     st.markdown("---")
 
-                    # Зведена таблиця з "чистими" продажами
                     st.markdown("**Деталізація по продуктах та періодах (фактичні замовлення)**")
                     pivot_table = group.pivot_table(
                         index='product_name',
@@ -133,9 +171,4 @@ def show():
                         fill_value=0
                     )
 
-                    # Функція для підсвічування всіх позитивних значень
-                    def highlight_positive(val):
-                        color = '#4B6F44' if val > 0 else ''  # Світло-зелений для позитивних значень
-                        return f'background-color: {color}'
-
-                    st.dataframe(pivot_table.style.applymap(highlight_positive).format('{:.0f}'))
+                    st.dataframe(pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))

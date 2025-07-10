@@ -1,14 +1,16 @@
 import pandas as pd
 
+
 def create_full_address(df: pd.DataFrame) -> pd.DataFrame:
     """Створює єдину колонку 'full_address' для групування."""
     if 'full_address' not in df.columns:
         df['full_address'] = (
-            df['city'].astype(str).fillna('') + ", " +
-            df['street'].astype(str).fillna('') + ", " +
-            df['house_number'].astype(str).fillna('')
+                df['city'].astype(str).fillna('') + ", " +
+                df['street'].astype(str).fillna('') + ", " +
+                df['house_number'].astype(str).fillna('')
         ).str.strip(' ,')
     return df
+
 
 def create_address_client_map(df: pd.DataFrame) -> dict:
     """
@@ -26,6 +28,7 @@ def create_address_client_map(df: pd.DataFrame) -> dict:
         .to_dict()
     )
     return address_map
+
 
 def calculate_main_kpis(df: pd.DataFrame) -> dict:
     """
@@ -58,19 +61,17 @@ def calculate_main_kpis(df: pd.DataFrame) -> dict:
         "rev_top_products": product_sales.sort_values(ascending=True).head(5)
     }
 
+
 def compute_actual_sales(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Розраховує "чисті" продажі між декадами.
-    Це складна логіка, яка тепер ізольована в одній функції.
+    Розраховує "чисті" продажі між декадами з виправленою логікою.
     """
     if df.empty or 'decade' not in df.columns:
         return pd.DataFrame(columns=['product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity'])
 
-    # Переконуємось, що адреса існує
     df = create_full_address(df)
     df = df[df['full_address'] != '']
 
-    # Агрегуємо, щоб уникнути дублікатів перед розрахунком
     group_agg = df.groupby(['product_name', 'full_address', 'year', 'month', 'decade'])['quantity'].sum().reset_index()
 
     pivot = group_agg.pivot_table(
@@ -80,14 +81,29 @@ def compute_actual_sales(df: pd.DataFrame) -> pd.DataFrame:
         fill_value=0
     )
 
-    # Розрахунок "чистих" продажів
-    pivot['fact_30'] = pivot.get('30', 0) - pivot.get('20', 0)
-    pivot['fact_20'] = pivot.get('20', 0) - pivot.get('10', 0)
-    pivot['fact_10'] = pivot.get('10', 0)
+    # --- ВИПРАВЛЕНА ЛОГІКА РОЗРАХУНКУ ФАКТИЧНИХ ПРОДАЖІВ ---
+
+    # Фактичні продажі за 10-ту декаду - це просто сума на 10-ту декаду
+    fact_10 = pivot.get('10', 0)
+
+    # Фактичні продажі за 20-ту декаду розраховуються, тільки якщо колонка '20' існує
+    fact_20 = (pivot['20'] - pivot.get('10', 0)) if '20' in pivot.columns else 0
+
+    # Фактичні продажі за 30-ту декаду розраховуються, тільки якщо колонка '30' існує
+    if '30' in pivot.columns:
+        # Базою для віднімання є остання існуюча декада (20 або 10)
+        base_for_30 = pivot.get('20', pivot.get('10', 0))
+        fact_30 = pivot['30'] - base_for_30
+    else:
+        fact_30 = 0
+
+    pivot['fact_10'] = fact_10
+    pivot['fact_20'] = fact_20
+    pivot['fact_30'] = fact_30
 
     result = pivot[['fact_10', 'fact_20', 'fact_30']].stack().reset_index()
     result.columns = ['product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity']
     result['decade'] = result['decade'].str.replace('fact_', '')
 
-    # Повертаємо тільки ті рядки, де були фактичні продажі
-    return result[result['actual_quantity'] > 0]
+    # Повертаємо тільки ті рядки, де були фактичні продажі (додатні або від'ємні)
+    return result[result['actual_quantity'] != 0]
