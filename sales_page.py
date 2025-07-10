@@ -63,6 +63,13 @@ def show():
         if 'sales_df_full' in st.session_state and not st.session_state.sales_df_full.empty:
             df_full = st.session_state['sales_df_full']
 
+            # Створюємо колонку адреси у df_full (як у df_display_client)
+            df_full['full_address_processed'] = (
+                df_full['city'].astype(str).fillna('') + ", " +
+                df_full['street'].astype(str).fillna('') + ", " +
+                df_full['house_number'].astype(str).fillna('')
+            ).str.strip(' ,')
+
 
             # 1. Фільтруємо дані, залишаючи тільки ті, де 'decade' дорівнює 30
             df_decade_30 = df_full[df_full['decade'] == "30"].copy()
@@ -253,6 +260,14 @@ def show():
                 if selected_street_client != "Всі":
                     df_display_client = df_display_client[df_display_client['street'] == selected_street_client]
 
+                # --- Створюємо мапу адреса → клієнти для відображення у заголовках ---
+                address_clients_map = (
+                    df_full.groupby('full_address_processed')['client']
+                    .unique()
+                    .apply(lambda x: ', '.join(sorted(x[:3])) + ('...' if len(x) > 3 else ''))
+                    .to_dict()
+                )
+
                 # --- ІНТЕГРОВАНИЙ БЛОК РОЗРАХУНКУ ФАКТИЧНИХ ПРОДАЖІВ ---
 
                 # 1. Створюємо унікальну повну адресу для групування
@@ -271,15 +286,26 @@ def show():
                 # 3. Сортуємо дані, щоб декади йшли в правильному порядку
                 df_display_client = df_display_client.sort_values(by=grouping_cols + ['decade'])
 
-                # 4. Розраховуємо фактичну кількість, віднімаючи попереднє накопичене значення
-                df_display_client['actual_quantity'] = df_display_client.groupby(grouping_cols)['quantity'].diff()
+                # 4-6. Коректний розрахунок фактичної кількості між декадами
+                def compute_actual(group):
+                    # Агрегуємо кількість по унікальних декадах, щоб уникнути дублювання
+                    group_agg = group.groupby(['product_name', 'full_address_processed', 'year', 'month', 'decade'])['quantity'].sum().reset_index()
 
-                # 5. Заповнюємо пусті значення (для перших декад) початковими даними
-                df_display_client['actual_quantity'] = df_display_client['actual_quantity'].fillna(
-                    df_display_client['quantity'])
+                    pivot = group_agg.pivot(index=['product_name', 'full_address_processed', 'year', 'month'],
+                                            columns='decade',
+                                            values='quantity').fillna(0)
 
-                # 6. Перетворюємо на ціле число
-                df_display_client['actual_quantity'] = df_display_client['actual_quantity'].astype(int)
+                    pivot['fact_30'] = pivot.get('30', 0) - (pivot.get('20', 0) if '20' in pivot else pivot.get('10', 0))
+                    pivot['fact_20'] = pivot.get('20', 0) - pivot.get('10', 0)
+                    pivot['fact_10'] = pivot.get('10', 0)
+
+                    result = pivot[['fact_10', 'fact_20', 'fact_30']].stack().reset_index()
+                    result.columns = ['product_name', 'full_address_processed', 'year', 'month', 'decade', 'actual_quantity']
+                    result['decade'] = result['decade'].str.replace('fact_', '')
+                    return result
+
+                grouped_actual = df_display_client.groupby(['product_name', 'full_address_processed', 'year', 'month'])
+                df_display_client = grouped_actual.apply(compute_actual).reset_index(drop=True)
 
                 # --- КІНЕЦЬ ІНТЕГРОВАНОГО БЛОКУ ---
 
@@ -292,11 +318,8 @@ def show():
                     st.info(f"Знайдено {grouped.ngroups} унікальних адрес.")
 
                     for full_address, group in grouped:
-                        unique_clients = group['client'].dropna().unique()
-                        max_clients = 3
-                        clients_preview = ', '.join(unique_clients[:max_clients])
-                        suffix = "..." if len(unique_clients) > max_clients else ""
-                        expander_title = f"**{full_address}** – {clients_preview}{suffix}"
+                        client_names = address_clients_map.get(full_address, "")
+                        expander_title = f"**{full_address}** – {client_names}"
 
                         with st.expander(expander_title):
                             # KPI для конкретної адреси (ОНОВЛЕНО)
