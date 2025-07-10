@@ -1,12 +1,11 @@
 [theme]
-# Яскравий та енергійний оранжевий, як смуги на боці машини.
-primaryColor="#FF8C00"
 
-# Глибокий, темний сірий (Gunmetal), що імітує колір кузова.
-backgroundColor="#36454F"
+primaryColor="#E1B124"
 
-# Майже чорний колір для бічної панелі, що нагадує про решітку радіатора та затемнені вікна.
-secondaryBackgroundColor="#2C3539"
 
-# Дуже світло-сірий (майже білий) для тексту, щоб забезпечити чудовий контраст і читабельність.
-textColor="#EAEAEA"
+backgroundColor="#f1f0ec"
+
+
+secondaryBackgroundColor="#5c765e"
+
+textColor="#16232a"
