@@ -97,9 +97,12 @@ def show():
                             city_product_pivot.sum(axis=1).sort_values(ascending=False).index]
 
                     def highlight_positive_custom(val):
-                        color = '#4B6F44' if val > 0 else ''
-                        return f'background-color: {color}'
+                        if val > 0:
+                            return 'background-color: #5c765e; color: white;'
+                        else:
+                            return ''
 
+                    city_product_pivot.index.name = "Місто"
                     st.dataframe(city_product_pivot.style.applymap(highlight_positive_custom).format('{:.0f}'))
 
                     with st.expander("Показати теплову карту продажів"):
@@ -121,8 +124,10 @@ def show():
             st.warning("За обраними фільтрами не знайдено даних для розрахунку.")
         else:
             def highlight_positive_dark_green(val):
-                color = '#4B6F44' if val > 0 else ''
-                return f'background-color: {color}'
+                if val > 0:
+                    return 'background-color: #5c765e; color: white;'
+                else:
+                    return ''
 
             st.subheader("Загальна зведена таблиця по фактичних продажах")
             st.markdown("Ця таблиця показує сумарні фактичні продажі за всіма відфільтрованими адресами.")
@@ -134,6 +139,7 @@ def show():
                 aggfunc='sum',
                 fill_value=0
             )
+            summary_pivot_table.index.name = "Препарати"
 
             st.dataframe(summary_pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))
             st.markdown("---")
@@ -170,5 +176,5 @@ def show():
                         aggfunc='sum',
                         fill_value=0
                     )
-
+                    pivot_table.index.name = "Препарати"
                     st.dataframe(pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))
