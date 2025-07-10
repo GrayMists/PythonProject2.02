@@ -26,12 +26,13 @@ def show():
 
     # --- ВКЛАДКА 1: Загальний огляд ---
     with tab1:
-        st.header("Загальний огляд продажів за 30-ту декаду")
+        st.header("Загальний огляд продажів")
+        st.write("Всі днаі динамічно змінюються згідно обраних фільтрів")
 
         # 1. Фільтруємо дані для цієї вкладки
         df_decade_30 = df_full[df_full['decade'] == "30"].copy()
         if df_decade_30.empty:
-            st.warning("У завантажених даних немає продажів за '30-ту' декаду.")
+            st.warning("У завантажених даних немає продажів за обраний період.")
         else:
             # 2. Відображаємо та застосовуємо локальні фільтри
             selected_city, selected_street = ui_components.render_local_filters(df_decade_30, key_prefix="tab1")
@@ -102,21 +103,21 @@ def show():
 
             for full_address, group in grouped:
                 # Отримуємо імена клієнтів зі словника
-                client_names = address_client_map.get(full_address, "Невідомий клієнт")
-                expander_title = f"**{full_address}** (Клієнти: *{client_names}*)"
+                client_names = address_client_map.get(full_address, "Невідома Аптека")
+                expander_title = f"**{full_address}** (Аптека: *{client_names}*)"
 
                 with st.expander(expander_title):
                     total_actual_quantity = group['actual_quantity'].sum()
                     st.metric("Всього фактичних продажів за адресою:", f"{total_actual_quantity:,}")
 
                     # Відображаємо унікальні адреси доставки
-                    st.markdown("**Точки доставки за цією адресою:**")
+                    st.markdown("<span style='font-size: 0.9em'><strong>Точки доставки за цією адресою:</strong></span>", unsafe_allow_html=True)
                     original_rows = df_display_client[df_display_client['full_address'] == full_address]
                     unique_delivery_addresses = original_rows['delivery_address'].dropna().unique()
 
                     if len(unique_delivery_addresses) > 0:
                         for addr in sorted(unique_delivery_addresses):
-                            st.markdown(f"- {addr}")
+                            st.markdown(f"<span style='font-size: 0.8em'>{addr}</span>", unsafe_allow_html=True)
                     else:
                         st.markdown("- *Адреси доставки не вказано*")
 
@@ -134,7 +135,7 @@ def show():
 
                     # Функція для підсвічування всіх позитивних значень
                     def highlight_positive(val):
-                        color = '#a8d08d' if val > 0 else ''  # Світло-зелений для позитивних значень
+                        color = '#4B6F44' if val > 0 else ''  # Світло-зелений для позитивних значень
                         return f'background-color: {color}'
 
                     st.dataframe(pivot_table.style.applymap(highlight_positive).format('{:.0f}'))
