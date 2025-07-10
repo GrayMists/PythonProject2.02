@@ -12,8 +12,6 @@ st.set_page_config(
 )
 
 # --- Бічна панель з меню та глобальними фільтрами ---
-# Архітектурне рішення: фільтри для завантаження даних є глобальними і живуть на бічній панелі.
-# Це дозволяє завантажити дані один раз, а потім аналізувати їх на різних сторінках без перезавантаження.
 with st.sidebar:
     selected_page = option_menu(
         menu_title="Головне меню",
@@ -26,15 +24,25 @@ with st.sidebar:
     st.title("Панель управління")
     st.header("Глобальні фільтри")
 
-    # У реальному додатку ці списки можна завантажувати з бази даних
-    available_territories = ["Всі", "Територія 1", "Територія 2", "Територія 3"]
-    available_lines = ["Всі", "Лінія 1", "Лінія 2"]
+    # --- ОНОВЛЕНА ЛОГІКА ВИБОРУ ТЕРИТОРІЇ ---
+    # Створюємо словник для співставлення імен та значень
+    TERRITORY_MAP = {
+        "Всі території": "Всі",
+        "Тарас і Марійка": "Територія 1",
+        "Наталя та Ігор": "Територія 2",
+    }
 
-    selected_territory = st.selectbox("Територія:", available_territories)
+    # Для вибору користувачеві показуємо тільки ключі (зрозумілі імена)
+    available_territory_names = list(TERRITORY_MAP.keys())
+    selected_territory_name = st.selectbox("Територія:", available_territory_names)
+
+    # Отримуємо технічне значення, яке відповідає обраному імені
+    territory_to_pass = TERRITORY_MAP[selected_territory_name]
+
+
+    available_lines = ["Всі", "Лінія 1", "Лінія 2"]
     selected_line = st.selectbox("Лінійка:", available_lines)
 
-    # --- ВИПРАВЛЕНА ЛОГІКА ВИБОРУ МІСЯЦІВ ---
-    # Повернено до оригінального, робочого варіанту
     month_map = {
         "Січень": 1, "Лютий": 2, "Березень": 3, "Квітень": 4,
         "Травень": 5, "Червень": 6, "Липень": 7, "Серпень": 8,
@@ -46,15 +54,13 @@ with st.sidebar:
         options=list(month_map.keys())
     )
 
-    # Конвертуємо назви місяців у список двозначних рядків (напр. "05"),
-    # як того очікує база даних.
     months_to_load = [f"{month_map[name]:02d}" for name in selected_month_names]
 
     if st.button("Отримати дані", type="primary"):
         with st.spinner("Завантаження даних... Це може зайняти деякий час."):
-            # Викликаємо функцію з окремого модуля data_loader
+            # У функцію передаємо вже технічне значення території
             st.session_state.sales_df_full = fetch_all_sales_data(
-                territory=selected_territory,
+                territory=territory_to_pass,
                 line=selected_line,
                 months=months_to_load
             )
@@ -66,10 +72,8 @@ with st.sidebar:
 
 
 # --- Відображення обраної сторінки ("Роутер") ---
-# Цей блок викликає відповідну функцію з модуля pages_logic на основі вибору в меню
 if selected_page == "Аналіз продажів":
     sales_page.show()
 elif selected_page == "Завантаження даних":
-    # upload_page.show() # Тут буде виклик функції для сторінки завантаження
     st.title("Сторінка завантаження даних")
     st.info("Ця частина додатку в розробці.")
