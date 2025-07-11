@@ -12,7 +12,7 @@ def fetch_all_sales_data(territory: str, line: str, months: list) -> pd.DataFram
     offset = 0
     page_size = 1000  # Supabase має ліміт у 1000 записів за раз
 
-    select_query = "client, product_name, quantity, city, street, house_number, territory, adding, product_line, delivery_address, year, month, decade"
+    select_query = "client,new_client, product_name, quantity, city, street, house_number, territory, adding, product_line, delivery_address, year, month, decade"
 
     while True:
         try:

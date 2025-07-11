@@ -44,7 +44,8 @@ def calculate_main_kpis(df: pd.DataFrame) -> dict:
 
     total_quantity = df['quantity'].sum()
     unique_products = df['product_name'].nunique()
-    unique_clients = df['full_address'].nunique()
+    unique_clients = df.drop_duplicates(subset=['new_client', 'full_address']).shape[0]
+
     avg_quantity_per_client = total_quantity / unique_clients if unique_clients else 0
 
     product_sales = df.groupby('product_name')['quantity'].sum().sort_values(ascending=False)
@@ -54,7 +55,7 @@ def calculate_main_kpis(df: pd.DataFrame) -> dict:
     return {
         "total_quantity": total_quantity,
         "unique_products": unique_products,
-        "unique_clients": unique_clients,
+        "unique_clients": unique_clients,  # Тепер цей ключ містить потрібну вам цифру
         "avg_quantity_per_client": avg_quantity_per_client,
         "top5_share": top5_share,
         "top_products": product_sales.head(5),
@@ -66,16 +67,20 @@ def compute_actual_sales(df: pd.DataFrame) -> pd.DataFrame:
     """
     Розраховує "чисті" продажі між декадами з виправленою логікою.
     """
-    if df.empty or 'decade' not in df.columns:
-        return pd.DataFrame(columns=['product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity'])
+    # ### ЗМІНЕНО ###: Додано 'new_client' до перевірки та до повернення порожнього DF
+    required_cols = ['new_client', 'product_name', 'full_address', 'year', 'month', 'decade', 'quantity']
+    if df.empty or not all(col in df.columns for col in required_cols):
+        return pd.DataFrame(columns=['new_client', 'product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity'])
 
     df = create_full_address(df)
     df = df[df['full_address'] != '']
 
-    group_agg = df.groupby(['product_name', 'full_address', 'year', 'month', 'decade'])['quantity'].sum().reset_index()
+    # ### ЗМІНЕНО ###: Додаємо 'new_client' до групування, щоб не втратити його
+    group_agg = df.groupby(['new_client', 'product_name', 'full_address', 'year', 'month', 'decade'])['quantity'].sum().reset_index()
 
+    # ### ЗМІНЕНО ###: Додаємо 'new_client' до індексу зведеної таблиці
     pivot = group_agg.pivot_table(
-        index=['product_name', 'full_address', 'year', 'month'],
+        index=['new_client', 'product_name', 'full_address', 'year', 'month'],
         columns='decade',
         values='quantity',
         fill_value=0
@@ -102,7 +107,7 @@ def compute_actual_sales(df: pd.DataFrame) -> pd.DataFrame:
     pivot['fact_30'] = fact_30
 
     result = pivot[['fact_10', 'fact_20', 'fact_30']].stack().reset_index()
-    result.columns = ['product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity']
+    result.columns = ['new_client', 'product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity']
     result['decade'] = result['decade'].str.replace('fact_', '')
 
     # Повертаємо тільки ті рядки, де були фактичні продажі (додатні або від'ємні)

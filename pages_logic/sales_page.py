@@ -110,54 +110,57 @@ def show():
 
     # --- ВКЛАДКА 2: Деталізація по адресах ---
     with tab2:
-        st.header("Деталізація фактичних замовлень по унікальних адресах")
+        st.header("Деталізація фактичних замовлень по клієнтах та адресах")
 
-        # 1. Локальні фільтри для цієї вкладки
+        # 1. Фільтри та розрахунок продажів (без змін)
         city_client, street_client = ui_components.render_local_filters(df_full, key_prefix="tab2")
         df_display_client = ui_components.apply_filters(df_full, city_client, street_client)
 
-        # 2. Розраховуємо "чисті" продажі
         with st.spinner("Розрахунок фактичних продажів..."):
             df_actual_sales = data_processing.compute_actual_sales(df_display_client)
 
-        if df_actual_sales.empty:
+        if 'new_client' not in df_actual_sales.columns:
+            st.error("Помилка: у даних відсутня колонка 'new_client'. Оновіть запит до бази даних.")
+        elif df_actual_sales.empty:
             st.warning("За обраними фільтрами не знайдено даних для розрахунку.")
         else:
             def highlight_positive_dark_green(val):
-                if val > 0:
-                    return 'background-color: #5c765e; color: white;'
-                else:
-                    return ''
+                return 'background-color: #5c765e; color: white;' if val > 0 else ''
 
+            # Загальна зведена таблиця (без змін)
             st.subheader("Загальна зведена таблиця по фактичних продажах")
-            st.markdown("Ця таблиця показує сумарні фактичні продажі за всіма відфільтрованими адресами.")
-
             summary_pivot_table = df_actual_sales.pivot_table(
                 index='product_name',
                 columns=['year', 'month', 'decade'],
                 values='actual_quantity',
-                aggfunc='sum',
-                fill_value=0
+                aggfunc='sum', fill_value=0
             )
             summary_pivot_table.index.name = "Препарати"
-
             st.dataframe(summary_pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))
             st.markdown("---")
 
-            grouped = df_actual_sales.groupby('full_address')
-            st.info(
-                f"Знайдено {grouped.ngroups} унікальних адрес з фактичними продажами. Натисніть на адресу, щоб побачити деталі.")
+            ### --- ОСНОВНА ЗМІНА ЛОГІКИ ТУТ --- ###
 
-            for full_address, group in grouped:
-                client_names = address_client_map.get(full_address, "Невідомий клієнт")
-                expander_title = f"**{full_address}** (Клієнти: *{client_names}*)"
+            # 1. Групуємо одразу за парою "клієнт-адреса"
+            grouped = df_actual_sales.groupby(['new_client', 'full_address'])
+
+            st.info(f"Знайдено **{grouped.ngroups}** унікальних пар 'клієнт-адреса' з фактичними продажами.")
+
+            # 2. Ітеруємо по згрупованих даних
+            for (client_name, full_address), group in grouped:
+
+                # 3. Формуємо єдиний заголовок для експандера
+                expander_title = f"**{client_name}** | 📍 {full_address}"
 
                 with st.expander(expander_title):
                     total_actual_quantity = group['actual_quantity'].sum()
-                    st.metric("Всього фактичних продажів за адресою:", f"{total_actual_quantity:,}")
+                    st.metric("Всього фактичних продажів:", f"{total_actual_quantity:,.0f}")
 
                     st.markdown("**Точки доставки за цією адресою:**")
-                    original_rows = df_display_client[df_display_client['full_address'] == full_address]
+                    original_rows = df_display_client[
+                        (df_display_client['full_address'] == full_address) &
+                        (df_display_client['new_client'] == client_name)
+                        ]
                     unique_delivery_addresses = original_rows['delivery_address'].dropna().unique()
 
                     if len(unique_delivery_addresses) > 0:
@@ -168,13 +171,12 @@ def show():
 
                     st.markdown("---")
 
-                    st.markdown("**Деталізація по продуктах та періодах (фактичні замовлення)**")
+                    st.markdown("**Деталізація по продуктах та періодах:**")
                     pivot_table = group.pivot_table(
                         index='product_name',
                         columns=['year', 'month', 'decade'],
                         values='actual_quantity',
-                        aggfunc='sum',
-                        fill_value=0
+                        aggfunc='sum', fill_value=0
                     )
                     pivot_table.index.name = "Препарати"
                     st.dataframe(pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))

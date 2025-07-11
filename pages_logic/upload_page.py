@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import re
-from utils import supabase, PRODUCTS_DICT # Імпортуємо спільні дані
+from utils import supabase, PRODUCTS_DICT  # Імпортуємо спільні дані
+
 
 # --- Функції для роботи з даними ---
 
@@ -26,16 +27,32 @@ def get_golden_address(address: str, golden_map: dict) -> dict:
     default_result = {'city': None, 'street': None, 'number': None, 'territory': None}
     return golden_map.get(lookup_key, default_result)
 
+
 # --- Головна функція для відображення сторінки ---
 
 def show():
     """Відображає сторінку для завантаження та обробки даних."""
     st.title("🚀 Інструмент для завантаження та стандартизації даних")
     st.write(
-        "Завантажте ваш Excel-файл. Еталонні дані та регіони будуть автоматично завантажені з бази даних Supabase."
+        "Завантажте ваш Excel-файл. Еталонні дані, регіони та клієнти будуть автоматично завантажені з бази даних Supabase."
     )
 
+    # Завантажуємо всі необхідні довідники на початку
     all_regions_data = load_data_from_supabase("region")
+
+    ### НОВИЙ КОД ###
+    # Завантажуємо дані клієнтів
+    all_clients_data = load_data_from_supabase("client")
+    if all_clients_data:
+        # Створюємо словник для зіставлення: {'стара назва': 'нова назва'}
+        client_map = {
+            str(row.get("client")).strip(): row.get("new_client")
+            for row in all_clients_data
+        }
+    else:
+        st.warning("Не вдалося завантажити довідник клієнтів. Зіставлення не буде виконано.")
+        client_map = {}
+    ### КІНЕЦЬ НОВОГО КОДУ ###
 
     col1, col2 = st.columns(2)
     with col1:
@@ -57,35 +74,43 @@ def show():
         if uploaded_file is not None and selected_region_name is not None:
             try:
                 df = pd.read_excel(uploaded_file)
-                required_columns = ['Регіон', 'Факт.адреса доставки', 'Найменування']
+                required_columns = ['Регіон', 'Факт.адреса доставки', 'Найменування', 'Клієнт']  ### ЗМІНЕНО ###
                 if not all(col in df.columns for col in required_columns):
-                    st.error(f"Помилка: В основному файлі відсутня одна з необхідних колонок: {', '.join(required_columns)}.")
+                    st.error(
+                        f"Помилка: В основному файлі відсутня одна з необхідних колонок: {', '.join(required_columns)}.")
                 else:
                     df_filtered = df[df['Регіон'] == selected_region_name].copy()
                     if df_filtered.empty:
                         st.warning(f"У файлі не знайдено жодного рядка для регіону '{selected_region_name}'.")
                     else:
                         with st.spinner(f"Завантажуємо 'золоті' адреси для регіону '{selected_region_name}'..."):
-                            selected_region_id = next((r['id'] for r in all_regions_data if r['name'] == selected_region_name), None)
+                            selected_region_id = next(
+                                (r['id'] for r in all_regions_data if r['name'] == selected_region_name), None)
                             if selected_region_id is None:
                                 st.error(f"Не вдалося знайти ID для регіону '{selected_region_name}'.")
                                 st.stop()
-                            response = supabase.table("golden_addres").select("*").eq("region_id", selected_region_id).execute()
+                            response = supabase.table("golden_addres").select("*").eq("region_id",
+                                                                                      selected_region_id).execute()
                             filtered_golden_data = response.data
                             golden_map = {
                                 str(row.get("Факт.адреса доставки")).lower().strip(): {
                                     'city': row.get("Місто"), 'street': row.get("Вулиця"),
-                                    'number': str(row.get("Номер будинку")) if row.get("Номер будинку") is not None else None,
+                                    'number': str(row.get("Номер будинку")) if row.get(
+                                        "Номер будинку") is not None else None,
                                     'territory': row.get("Територія")
                                 } for row in filtered_golden_data
                             }
-                        with st.spinner("✨ Зіставляємо адреси з 'золотим' списком..."):
-                            parsed_addresses = df_filtered['Факт.адреса доставки'].apply(get_golden_address, golden_map=golden_map)
+                        with st.spinner("✨ Зіставляємо адреси та клієнтів..."):  ### ЗМІНЕНО ###
+                            parsed_addresses = df_filtered['Факт.адреса доставки'].apply(get_golden_address,
+                                                                                         golden_map=golden_map)
                             parsed_df = pd.json_normalize(parsed_addresses)
-                            parsed_df = parsed_df.rename(columns={'city': 'City', 'street': 'Street', 'number': 'House_Number', 'territory': 'Territory'})
+                            parsed_df = parsed_df.rename(
+                                columns={'city': 'City', 'street': 'Street', 'number': 'House_Number',
+                                         'territory': 'Territory'})
                             df_filtered.reset_index(drop=True, inplace=True)
                             parsed_df.reset_index(drop=True, inplace=True)
-                            df_filtered.drop(columns=['Вулиця', 'Номер будинку', 'Територія', 'Adding'], inplace=True, errors='ignore')
+                            df_filtered.drop(columns=['Вулиця', 'Номер будинку', 'Територія', 'Adding'], inplace=True,
+                                             errors='ignore')
                             result_df = pd.concat([df_filtered, parsed_df], axis=1)
                             date_match = re.search(r'(\d{4}_\d{2}(_\d{2})?)', uploaded_file.name)
                             result_df['Adding'] = date_match.group(0) if date_match else None
@@ -97,12 +122,21 @@ def show():
                             else:
                                 result_df['year'] = result_df['month'] = result_df['decade'] = None
                             result_df['Product_Line'] = result_df['Найменування'].str[3:].map(PRODUCTS_DICT)
+
+                            ### НОВИЙ КОД ###
+                            # Створюємо нову колонку з новими іменами клієнтів
+                            if client_map:
+                                result_df['new_client'] = result_df['Клієнт'].astype(str).str.strip().map(client_map)
+                            else:
+                                result_df['new_client'] = None  # Якщо словник порожній
+                            ### КІНЕЦЬ НОВОГО КОДУ ###
+
                             st.session_state['result_df'] = result_df
             except Exception as e:
                 st.error(f"Виникла помилка при обробці файлу: {e}")
 
     if 'result_df' in st.session_state:
-        st.success("Готово! Адреси успішно оброблено.")
+        st.success("Готово! Дані успішно оброблено.")
         result_df = st.session_state['result_df']
         st.dataframe(result_df)
         unmatched_df = result_df[result_df['City'].isna()]
@@ -112,6 +146,14 @@ def show():
         else:
             st.balloons()
             st.success("🎉 Чудово! Всі адреси з обраного регіону були знайдені в еталонному списку.")
+        # Показуємо клієнтів, яких не вдалося знайти у довіднику
+        unmatched_clients_df = result_df[result_df['new_client'].isna() & result_df['Клієнт'].notna()]
+        if not unmatched_clients_df.empty:
+            st.subheader("⚠️ Клієнти, не знайдені в еталонному списку")
+            # Виводимо тільки унікальні імена клієнтів
+            st.dataframe(unmatched_clients_df[['Клієнт']].drop_duplicates())
+
+
         if st.button("💾 Завантажити дані у Supabase", key="upload_button"):
             with st.spinner("Завантаження даних до Supabase..."):
                 try:
@@ -121,9 +163,19 @@ def show():
                         "Факт.адреса доставки": "delivery_address", "Найменування": "product_name",
                         "Кількість": "quantity", "Adding": "adding", "City": "city",
                         "Street": "street", "House_Number": "house_number", "Territory": "territory",
-                        "Product_Line": "product_line", "year": "year", "month": "month", "decade": "decade"
+                        "Product_Line": "product_line", "year": "year", "month": "month", "decade": "decade",
+                        "new_client": "new_client"  ### ЗМІНЕНО ###
                     })
-                    columns_to_upload = ["distributor", "region", "city_xls", "edrpou", "client", "client_legal_address", "delivery_address", "product_name", "quantity", "adding", "city", "street", "house_number", "territory", "product_line", "year", "month", "decade"]
+
+                    ### ЗМІНЕНО ###
+                    # Додаємо нову колонку до списку для завантаження
+                    columns_to_upload = [
+                        "distributor", "region", "city_xls", "edrpou", "client",
+                        "client_legal_address", "delivery_address", "product_name",
+                        "quantity", "adding", "city", "street", "house_number",
+                        "territory", "product_line", "year", "month", "decade", "new_client"
+                    ]
+
                     final_upload_df = upload_df[[col for col in columns_to_upload if col in upload_df.columns]]
                     final_upload_df = final_upload_df.where(pd.notna(final_upload_df), None)
                     data_to_insert = final_upload_df.to_dict(orient='records')
@@ -131,6 +183,7 @@ def show():
                     if response.data:
                         st.success(f"✅ Дані успішно завантажено. Вставлено {len(response.data)} рядків.")
                     else:
-                        st.error(f"Помилка при завантаженні: {response.error.message if response.error else 'дані не були вставлені.'}")
+                        st.error(
+                            f"Помилка при завантаженні: {response.error.message if response.error else 'дані не були вставлені.'}")
                 except Exception as e:
                     st.error(f"Сталася помилка при підготовці або вставці даних: {e}")
