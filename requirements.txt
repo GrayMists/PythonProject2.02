@@ -5,3 +5,5 @@ openpyxl
 supabase
 plotly.express
 matplotlib
+workalendar
+numpy

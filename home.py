@@ -1,7 +1,7 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 from core.data_loader import fetch_all_sales_data
-from pages_logic import sales_page, upload_page # Логіка для сторінок імпортується сюди
+from pages_logic import sales_page, upload_page  # Логіка для сторінок імпортується сюди
 
 # --- Налаштування сторінки ---
 # Робимо це один раз на початку
@@ -24,7 +24,6 @@ with st.sidebar:
     st.title("Панель управління")
     st.header("Глобальні фільтри")
 
-    # --- ОНОВЛЕНА ЛОГІКА ВИБОРУ ТЕРИТОРІЇ ---
     # Створюємо словник для співставлення імен та значень
     TERRITORY_MAP = {
         "Всі території": "Всі",
@@ -38,7 +37,6 @@ with st.sidebar:
 
     # Отримуємо технічне значення, яке відповідає обраному імені
     territory_to_pass = TERRITORY_MAP[selected_territory_name]
-
 
     available_lines = ["Всі", "Лінія 1", "Лінія 2"]
     selected_line = st.selectbox("Лінійка:", available_lines)
@@ -57,6 +55,9 @@ with st.sidebar:
     months_to_load = [f"{month_map[name]:02d}" for name in selected_month_names]
 
     if st.button("Отримати дані", type="primary"):
+        # Зберігаємо обрану територію в стані сесії для використання на інших сторінках
+        st.session_state.selected_territory_value = territory_to_pass
+
         with st.spinner("Завантаження даних... Це може зайняти деякий час."):
             # У функцію передаємо вже технічне значення території
             st.session_state.sales_df_full = fetch_all_sales_data(
@@ -70,9 +71,10 @@ with st.sidebar:
         else:
             st.warning("За обраними фільтрами дані не знайдено.")
 
-
 # --- Відображення обраної сторінки ("Роутер") ---
 if selected_page == "Аналіз продажів":
     sales_page.show()
 elif selected_page == "Завантаження даних":
-    upload_page.show()
+    # Це місце для вашої сторінки завантаження
+    st.title("Сторінка завантаження даних")
+    st.info("Ця частина додатку в розробці.")
