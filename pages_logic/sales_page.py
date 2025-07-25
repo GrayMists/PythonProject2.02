@@ -15,6 +15,14 @@ def show():
         st.info("👈 Будь ласка, оберіть фільтри на бічній панелі та натисніть 'Отримати дані'.")
         st.stop()
 
+    # --- ЗМІНА: ДОДАНО НАДІЙНУ ПЕРЕВІРКУ НАЯВНОСТІ ID РЕГІОНУ ---
+
+    if 'selected_region_id' not in st.session_state or not st.session_state.get('selected_region_id'):
+        st.error("Помилка: ID регіону не знайдено в поточній сесії.")
+        st.info(
+            "Будь ласка, поверніться до панелі управління, оберіть фільтри та натисніть 'Отримати дані' ще раз, щоб оновити дані для аналізу.")
+        st.stop()
+
     df_full = st.session_state.sales_df_full
     df_full = data_processing.create_full_address(df_full.copy())
     address_client_map = data_processing.create_address_client_map(df_full)
@@ -132,7 +140,13 @@ def show():
                 st.warning("В даних за останню декаду не знайдено інформації про місяці.")
             else:
                 with st.spinner("Завантаження даних про ціни..."):
-                    price_df = data_loader.fetch_price_data(months_in_data)
+                    # --- ЗМІНА: ВИКОРИСТОВУЄМО ID РЕГІОНУ З СЕСІЇ ---
+                    region_id_to_load = st.session_state.selected_region_id
+
+                    price_df = data_loader.fetch_price_data(
+                        region_id=region_id_to_load,
+                        months=months_in_data
+                    )
 
                 if price_df.empty:
                     st.error("Не вдалося завантажити дані про ціни для обраних місяців. Розрахунок доходу неможливий.")

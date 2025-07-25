@@ -4,7 +4,6 @@ from utils import supabase
 
 
 @st.cache_data(ttl=3600)
-### <<< ЗМІНА 1: ДОДАНО 'region_name' В АРГУМЕНТИ ФУНКЦІЇ >>>
 def fetch_all_sales_data(region_name: str, territory: str, line: str, months: list) -> pd.DataFrame:
     """
     Завантажує дані з таблиці sales_data, використовуючи пагінацію та фільтри.
@@ -13,16 +12,14 @@ def fetch_all_sales_data(region_name: str, territory: str, line: str, months: li
     offset = 0
     page_size = 1000
 
-    select_query = "client,new_client, product_name, quantity, city, street, house_number, territory, adding, product_line, delivery_address, year, month, decade"
+    select_query = "client,new_client, product_name, quantity, city, street, house_number, territory, adding, product_line, delivery_address, year, month, decade, region"
 
     while True:
         try:
             query = supabase.table("sales_data").select(select_query).range(offset, offset + page_size - 1)
 
-            ### <<< ЗМІНА 2: ДОДАНО ЛОГІКУ ФІЛЬТРАЦІЇ ЗА РЕГІОНОМ >>>
             # Фільтруємо за назвою регіону, якщо вона обрана
             if region_name and region_name != "Оберіть регіон...":
-                # Припущення: колонка в таблиці sales_data називається 'region'
                 query = query.eq('region', region_name)
 
             # Існуючі фільтри
@@ -55,18 +52,22 @@ def fetch_all_sales_data(region_name: str, territory: str, line: str, months: li
 
 
 @st.cache_data(ttl=3600)
-def fetch_price_data(months: list[str]) -> pd.DataFrame:
+def fetch_price_data(region_id: int, months: list[str]) -> pd.DataFrame:
     """
-    Завантажує дані про ціни з таблиці 'price' для вказаних місяців.
+    Завантажує дані про ціни з таблиці 'price' для вказаного регіону та місяців.
     """
-    if not months:
+    if not months or not region_id:
         return pd.DataFrame()
 
     try:
-        # Конвертуємо рядкові місяці ('06') в числа ([6]) для запиту до бази
         numeric_months = [int(m) for m in months]
 
-        query = supabase.table("price").select("product_name, price, month").in_("month", numeric_months)
+        query = supabase.table("price").select("product_name, price, month")
+
+        # Додано фільтр за регіоном
+        query = query.eq("region_id", region_id)
+        query = query.in_("month", numeric_months)
+
         response = query.execute()
 
         if not response.data:
@@ -74,8 +75,6 @@ def fetch_price_data(months: list[str]) -> pd.DataFrame:
 
         price_df = pd.DataFrame(response.data)
         price_df = price_df.drop_duplicates(subset=['product_name', 'month'], keep='last')
-
-        # Конвертуємо типи, але ЗАЛИШАЄМО 'month' ЧИСЛОВИМ для коректного об'єднання
         price_df['price'] = pd.to_numeric(price_df['price'], errors='coerce')
         price_df['month'] = pd.to_numeric(price_df['month'], errors='coerce').astype('Int64')
 

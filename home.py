@@ -1,8 +1,8 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 from core.data_loader import fetch_all_sales_data
-from pages_logic import sales_page, upload_page  # Логіка для сторінок імпортується сюди
-from utils import supabase  # Імпортуємо supabase для прямих запитів
+from pages_logic import sales_page, upload_page
+from utils import supabase
 
 # --- Налаштування сторінки ---
 st.set_page_config(
@@ -31,7 +31,7 @@ def load_territories_for_region(region_id):
 with st.sidebar:
     selected_page = option_menu(
         menu_title="Головне меню",
-        options=["Аналіз продажів", "Завантаження продаж"],
+        options=["Аналіз продажів", "Завантаження даних"],
         icons=["bar-chart-line-fill", "cloud-upload-fill"],
         menu_icon="cast",
         default_index=0,
@@ -41,7 +41,6 @@ with st.sidebar:
     st.header("Глобальні фільтри")
 
     # --- ФІЛЬТР РЕГІОНІВ СТАВ ГОЛОВНИМ ---
-    # Використовуємо функцію завантаження з модуля upload_page, як і було раніше
     all_regions_data = upload_page.load_data_from_supabase("region")
     if all_regions_data:
         region_names = ["Оберіть регіон..."] + [r['name'] for r in all_regions_data]
@@ -69,7 +68,7 @@ with st.sidebar:
             territory_to_pass = TERRITORY_MAP[selected_territory_name_from_map]
 
             # Інші фільтри
-            available_lines = ["Всі", "Лінія 1", "Лінія 2"]  # Можна також завантажувати динамічно
+            available_lines = ["Всі", "Лінія 1", "Лінія 2"]
             selected_line = st.selectbox("3. Лінійка:", available_lines)
 
             month_map = {
@@ -84,9 +83,11 @@ with st.sidebar:
             months_to_load = [f"{month_map[name]:02d}" for name in selected_month_names]
 
             if st.button("Отримати дані", type="primary"):
+                # --- ЗМІНА: ЗБЕРІГАЄМО ID РЕГІОНУ В СЕСІЇ ---
+                st.session_state.selected_region_id = selected_region_id
                 st.session_state.selected_territory_value = territory_to_pass
+
                 with st.spinner("Завантаження даних... Це може зайняти деякий час."):
-                    # --- ПЕРЕДАЄМО НАЗВУ РЕГІОНУ У ФУНКЦІЮ ---
                     st.session_state.sales_df_full = fetch_all_sales_data(
                         region_name=selected_region_name,
                         territory=territory_to_pass,
@@ -104,5 +105,5 @@ with st.sidebar:
 # --- Відображення обраної сторінки ("Роутер") ---
 if selected_page == "Аналіз продажів":
     sales_page.show()
-elif selected_page == "Завантаження продаж":
+elif selected_page == "Завантаження даних":
     upload_page.show()
