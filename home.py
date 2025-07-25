@@ -31,7 +31,7 @@ def load_territories_for_region(region_id):
 with st.sidebar:
     selected_page = option_menu(
         menu_title="Головне меню",
-        options=["Аналіз продажів", "Завантаження даних"],
+        options=["Аналіз продажів", "Завантаження продаж"],
         icons=["bar-chart-line-fill", "cloud-upload-fill"],
         menu_icon="cast",
         default_index=0,
@@ -104,5 +104,5 @@ with st.sidebar:
 # --- Відображення обраної сторінки ("Роутер") ---
 if selected_page == "Аналіз продажів":
     sales_page.show()
-elif selected_page == "Завантаження даних":
+elif selected_page == "Завантаження продаж":
     upload_page.show()
