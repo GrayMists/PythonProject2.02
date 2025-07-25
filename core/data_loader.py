@@ -4,9 +4,10 @@ from utils import supabase
 
 
 @st.cache_data(ttl=3600)
-def fetch_all_sales_data(territory: str, line: str, months: list) -> pd.DataFrame:
+### <<< ЗМІНА 1: ДОДАНО 'region_name' В АРГУМЕНТИ ФУНКЦІЇ >>>
+def fetch_all_sales_data(region_name: str, territory: str, line: str, months: list) -> pd.DataFrame:
     """
-    Завантажує дані з таблиці sales_data, використовуючи пагінацію.
+    Завантажує дані з таблиці sales_data, використовуючи пагінацію та фільтри.
     """
     all_data = []
     offset = 0
@@ -18,6 +19,13 @@ def fetch_all_sales_data(territory: str, line: str, months: list) -> pd.DataFram
         try:
             query = supabase.table("sales_data").select(select_query).range(offset, offset + page_size - 1)
 
+            ### <<< ЗМІНА 2: ДОДАНО ЛОГІКУ ФІЛЬТРАЦІЇ ЗА РЕГІОНОМ >>>
+            # Фільтруємо за назвою регіону, якщо вона обрана
+            if region_name and region_name != "Оберіть регіон...":
+                # Припущення: колонка в таблиці sales_data називається 'region'
+                query = query.eq('region', region_name)
+
+            # Існуючі фільтри
             if territory != "Всі":
                 query = query.eq("territory", territory)
             if line != "Всі":
