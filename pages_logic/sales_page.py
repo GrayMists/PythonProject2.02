@@ -65,13 +65,26 @@ def show():
         if df_display.empty:
             st.warning("За обраними фільтрами дані відсутні.")
         else:
+            st.markdown("""
+                <style>
+                [data-testid="stMetricValue"] {
+                    font-size: 18px;
+                }
+                [data-testid="stMetricLabel"] {
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                </style>
+            """, unsafe_allow_html=True)
             kpis = data_processing.calculate_main_kpis(df_display)
             st.subheader("Ключові показники")
-            kpi_cols = st.columns(4)
+            kpi_cols = st.columns(5)
             kpi_cols[0].metric("Загальна кількість", f"{kpis['total_quantity']:,}")
             kpi_cols[1].metric("Унікальні продукти", f"{kpis['unique_products']:,}")
             kpi_cols[2].metric("Унікальні клієнти", f"{kpis['unique_clients']:,}")
             kpi_cols[3].metric("Частка ТОП-5 (%)", f"{kpis['top5_share']:.1f}%")
+            total_revenue = df_for_dynamics['revenue'].sum() if 'revenue' in df_for_dynamics.columns else 0
+            kpi_cols[4].metric("Загальний дохід", f"{total_revenue:,.2f} грн")
 
             visualizations.plot_sales_dynamics(df_for_dynamics)
             visualizations.plot_top_products_summary(df_display)

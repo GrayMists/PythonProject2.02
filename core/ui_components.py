@@ -10,7 +10,7 @@ def render_local_filters(df: pd.DataFrame, key_prefix: str) -> tuple:
     Створює локальні фільтри для міста та вулиці.
     Повертає обрані значення.
     """
-    st.markdown("##### Локальні фільтри")
+
     filter_cols = st.columns(2)
 
     with filter_cols[0]:

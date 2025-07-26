@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
+
 
 # Словник для перекладу номерів місяців у назви українською
 UKRAINIAN_MONTHS = {
@@ -44,22 +44,25 @@ def plot_top_products_summary(df: pd.DataFrame):
         st.markdown("**ТОП-5 найбільш продаваних**")
         top_order = top5_products.sort_values(by='Загальна кількість', ascending=True)['product_name']
         fig_top = px.bar(
-            df_top5_agg, y='product_name', x='quantity', color='month_name', orientation='h',
+            df_top5_agg, y='product_name', x='quantity', orientation='h',
             labels={'quantity': 'Кількість', 'product_name': 'Продукт', 'month_name': 'Місяць'},
-            category_orders={'product_name': top_order}
+            category_orders={'product_name': top_order},
+            color_discrete_sequence=['#00656e']
         )
+        fig_top.update_traces(textfont_color='black')
         totals_top = df_top5_agg.groupby('product_name')['quantity'].sum()
         for product in top_order:
             total_val = totals_top.get(product, 0)
             fig_top.add_annotation(
                 y=product, x=total_val, text=f"<b>{total_val}</b>", showarrow=False,
-                xanchor='left', xshift=5, font=dict(color="white")
+                xanchor='left', xshift=5, font=dict(color="black")
             )
         fig_top.update_layout(
             title_text="Найбільш продавані", title_x=0.5, yaxis_title=None, xaxis_title=None,
             uniformtext_minsize=8, uniformtext_mode='hide', legend_title_text='Місяць'
         )
         fig_top.update_xaxes(showticklabels=False)
+        fig_top.update_layout(showlegend=False)
         st.plotly_chart(fig_top, use_container_width=True)
 
 
@@ -114,10 +117,13 @@ def plot_sales_dynamics(df: pd.DataFrame):
                 y='quantity',
                 markers=True,
                 title="Динаміка продажів, уп.",
-                labels={'x_axis_label': '', 'quantity': 'Кількість'}
+                labels={'x_axis_label': '', 'quantity': 'Кількість'},
+                color_discrete_sequence=['#00656e']
             )
             fig_qty.update_layout(yaxis_title=None, xaxis_title=None)
             fig_qty.update_xaxes(type='category')
+            fig_qty.update_layout(showlegend=False)
+            fig_qty.update_layout(height=500)
             st.plotly_chart(fig_qty, use_container_width=True)
 
         with col2:
@@ -128,10 +134,13 @@ def plot_sales_dynamics(df: pd.DataFrame):
                     y='revenue',
                     markers=True,
                     title="Динаміка доходу, грн",
-                    labels={'x_axis_label': '', 'revenue': 'Дохід'}
+                    labels={'x_axis_label': '', 'revenue': 'Дохід'},
+                    color_discrete_sequence=['#2e3d30']
                 )
                 fig_rev.update_layout(yaxis_title=None, xaxis_title=None)
                 fig_rev.update_xaxes(type='category')
+                fig_rev.update_layout(showlegend=False)
+                fig_rev.update_layout(height=500)
                 st.plotly_chart(fig_rev, use_container_width=True)
             else:
                 st.info("Дані про дохід відсутні.")
@@ -151,10 +160,14 @@ def plot_sales_dynamics(df: pd.DataFrame):
             fig_qty = px.bar(
                 sales_by_decade, x='x_axis_label', y='actual_quantity', text='actual_quantity',
                 title=f"Продажі за декадами, уп.",
-                labels={'x_axis_label': '', 'actual_quantity': 'Кількість'}
+                labels={'x_axis_label': '', 'actual_quantity': 'Кількість'},
+                color_discrete_sequence=['#00656e']
             )
             fig_qty.update_traces(texttemplate='%{text:.0f}', textposition='outside')
+            fig_qty.update_traces(textfont_color='black')
             fig_qty.update_layout(uniformtext_minsize=8, yaxis_title=None, xaxis_title=None)
+            fig_qty.update_layout(showlegend=False)
+            fig_qty.update_layout(height=500)
             st.plotly_chart(fig_qty, use_container_width=True)
 
         with col2:
@@ -167,10 +180,14 @@ def plot_sales_dynamics(df: pd.DataFrame):
                 fig_rev = px.bar(
                     revenue_by_decade, x='x_axis_label', y='actual_revenue', text='actual_revenue',
                     title=f"Дохід за декадами, грн",
-                    labels={'x_axis_label': '', 'actual_revenue': 'Дохід'}
+                    labels={'x_axis_label': '', 'actual_revenue': 'Дохід'},
+                    color_discrete_sequence=['#5f7355']
                 )
                 fig_rev.update_traces(texttemplate='%{text:,.0f}', textposition='outside')
+                fig_rev.update_traces(textfont_color='black')
                 fig_rev.update_layout(uniformtext_minsize=8, yaxis_title=None, xaxis_title=None)
+                fig_rev.update_layout(showlegend=False)
+                fig_rev.update_layout(height=500)
                 st.plotly_chart(fig_rev, use_container_width=True)
             else:
                 st.info("Дані про дохід відсутні.")
