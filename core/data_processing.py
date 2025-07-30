@@ -123,7 +123,7 @@ def create_address_client_map(df: pd.DataFrame) -> dict:
     if 'full_address' not in df.columns or 'client' not in df.columns:
         return {}
     address_map = (
-        df.groupby('full_address')['client']
+        df.groupby('full_address')['new_client']
         .unique()
         .apply(lambda x: ', '.join(sorted(x)))
         .to_dict()

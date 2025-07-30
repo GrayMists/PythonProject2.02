@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from core import data_processing, ui_components, visualizations, data_loader
-from datetime import datetime
+
 
 
 def show():
@@ -127,12 +127,11 @@ def show():
             st.dataframe(summary_pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))
             st.markdown("---")
 
-            grouped = df_actual_sales.groupby('full_address')
-            st.info(f"Знайдено {grouped.ngroups} унікальних адрес з фактичними продажами.")
+            grouped = df_actual_sales.groupby(['full_address', 'new_client'])
+            st.info(f"Знайдено {grouped.ngroups} унікальних комбінацій адрес і клієнтів з фактичними продажами.")
 
-            for full_address, group in grouped:
-                client_names = address_client_map.get(full_address, "Невідомий клієнт")
-                expander_title = f"**{full_address}** (Клієнти: *{client_names}*)"
+            for (full_address, client_name), group in grouped:
+                expander_title = f"**{full_address}** (Клієнт: *{client_name}*)"
                 with st.expander(expander_title):
                     st.metric("Всього фактичних продажів за адресою:", f"{group['actual_quantity'].sum():,}")
                     pivot_table = group.pivot_table(index='product_name', columns=['year', 'month', 'decade'],
