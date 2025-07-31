@@ -83,8 +83,10 @@ def show():
             kpi_cols[1].metric("Унікальні продукти", f"{kpis['unique_products']:,}")
             kpi_cols[2].metric("Унікальні клієнти", f"{kpis['unique_clients']:,}")
             kpi_cols[3].metric("Частка ТОП-5 (%)", f"{kpis['top5_share']:.1f}%")
-            total_revenue = df_for_dynamics['revenue'].sum() if 'revenue' in df_for_dynamics.columns else 0
-            kpi_cols[4].metric("Загальний дохід", f"{total_revenue:,.2f} грн")
+            total_revenue_fact = df_latest_decade.merge(price_df_full, on=['product_name', 'month'], how='left')
+            total_revenue_fact['revenue'] = total_revenue_fact['quantity'] * total_revenue_fact['price']
+            fact_revenue_sum = total_revenue_fact['revenue'].sum() if 'revenue' in total_revenue_fact.columns else 0
+            kpi_cols[4].metric("Загальний дохід", f"{fact_revenue_sum:,.2f} грн")
 
             visualizations.plot_sales_dynamics(df_for_dynamics)
             visualizations.plot_top_products_summary(df_display)
