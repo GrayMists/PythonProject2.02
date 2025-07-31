@@ -108,9 +108,6 @@ def show():
         with st.spinner("Розрахунок фактичних продажів..."):
             if not df_display_client_filtered.empty:
                 df_actual_sales = data_processing.compute_actual_sales(df_display_client_filtered.copy())
-                # --- Додано для відладки: вивід df_actual_sales ---
-                st.subheader("DEBUG: Результат compute_actual_sales")
-                st.dataframe(df_actual_sales)
                 # --- Кінець секції відладки ---
             else:
                 df_actual_sales = pd.DataFrame()
