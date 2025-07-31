@@ -4,7 +4,6 @@ import plotly.express as px
 from core import data_processing, ui_components, visualizations, data_loader
 
 
-
 def show():
     """
     Відображає сторінку "Аналіз продажів".
@@ -25,6 +24,7 @@ def show():
     df_full = data_processing.create_full_address(df_full.copy())
     address_client_map = data_processing.create_address_client_map(df_full)
 
+    # Ensure 'year', 'month', 'decade' are numeric for consistent processing
     df_full['year'] = pd.to_numeric(df_full['year'], errors='coerce')
     df_full['month'] = pd.to_numeric(df_full['month'], errors='coerce')
     df_full['decade'] = pd.to_numeric(df_full['decade'], errors='coerce')
@@ -103,15 +103,15 @@ def show():
     with tab2:
         st.header("Деталізація фактичних замовлень по унікальних адресах")
         city_client, street_client = ui_components.render_local_filters(df_full, key_prefix="tab2")
-        df_display_client = ui_components.apply_filters(df_full, city_client, street_client)
+        df_display_client_filtered = ui_components.apply_filters(df_full, city_client, street_client)
 
         with st.spinner("Розрахунок фактичних продажів..."):
-            if not df_display_client.empty:
-                df_sorted = df_display_client.sort_values(
-                    by=['full_address', 'product_name', 'year', 'month', 'decade'])
-                df_sorted['actual_quantity'] = df_sorted.groupby(['full_address', 'product_name', 'year', 'month'])[
-                    'quantity'].diff().fillna(df_sorted['quantity'])
-                df_actual_sales = df_sorted[df_sorted['actual_quantity'] >= 0].copy()
+            if not df_display_client_filtered.empty:
+                df_actual_sales = data_processing.compute_actual_sales(df_display_client_filtered.copy())
+                # --- Додано для відладки: вивід df_actual_sales ---
+                st.subheader("DEBUG: Результат compute_actual_sales")
+                st.dataframe(df_actual_sales)
+                # --- Кінець секції відладки ---
             else:
                 df_actual_sales = pd.DataFrame()
 

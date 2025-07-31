@@ -12,7 +12,7 @@ def fetch_all_sales_data(region_name: str, territory: str, line: str, months: li
     offset = 0
     page_size = 1000
 
-    select_query = "client,new_client, product_name, quantity, city, street, house_number, territory, adding, product_line, delivery_address, year, month, decade, region"
+    select_query = "distributor,client,new_client, product_name, quantity, city, street, house_number, territory, adding, product_line, delivery_address, year, month, decade, region"
 
     while True:
         try:

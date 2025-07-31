@@ -4,6 +4,103 @@ from datetime import date, timedelta
 from workalendar.europe import Ukraine  # Бібліотека для розрахунку робочих днів в Україні
 
 
+# --- Існуючі функції без змін ---
+
+def create_full_address(df: pd.DataFrame) -> pd.DataFrame:
+    """Створює єдину колонку 'full_address' для групування."""
+    if 'full_address' not in df.columns:
+        df['full_address'] = (
+                df['city'].astype(str).fillna('') + ", " +
+                df['street'].astype(str).fillna('') + ", " +
+                df['house_number'].astype(str).fillna('')
+        ).str.strip(' ,')
+    return df
+
+
+# --- ОНОВЛЕНА ФУНКЦІЯ compute_actual_sales ---
+
+def compute_actual_sales(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Розраховує "чисті" продажі між декадами з виправленою логікою.
+    Ця версія враховує дистриб'ютора та клієнта, щоб розрахунки велися окремо для кожного,
+    і включає ретельну очистку текстових полів.
+    Припускається, що 'quantity' у вхідному DataFrame є КУМУЛЯТИВНОЮ сумою продажів
+    до кінця відповідної декади.
+    """
+    # Початкова перевірка на наявність критично важливих колонок
+    required_cols = ['decade', 'distributor', 'product_name', 'quantity', 'year', 'month', 'city', 'street', 'house_number', 'new_client']
+    for col in required_cols:
+        if col not in df.columns:
+            print(f"Попередження: Відсутня необхідна колонка '{col}'. Повертаю порожній DataFrame.")
+            return pd.DataFrame(
+                columns=['distributor', 'product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity', 'new_client'])
+
+    if df.empty:
+        print("Попередження: Вхідний DataFrame порожній. Повертаю порожній DataFrame.")
+        return pd.DataFrame(
+            columns=['distributor', 'product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity', 'new_client'])
+
+    # --- КРОК ОЧИЩЕННЯ ДАНИХ ---
+    # Примусово видаляємо зайві пробіли з ключових текстових полів.
+    text_cols_to_clean = ['distributor', 'product_name', 'city', 'street', 'house_number', 'new_client']
+    for col in text_cols_to_clean:
+        if col in df.columns: # Перевіряємо наявність колонки перед очищенням
+            df[col] = df[col].fillna('').astype(str).str.strip()
+
+    # Створення повної адреси відбувається ПІСЛЯ очищення її компонентів
+    # Використовуємо вашу оригінальну функцію create_full_address
+    df = create_full_address(df)
+    df = df[df['full_address'] != '']
+    # Перетворюємо 'decade' на числовий тип для коректного сортування
+    df['decade'] = pd.to_numeric(df['decade'], errors='coerce').fillna(0).astype(int)
+
+    # Додаткова перевірка: чи містить колонка 'distributor' лише порожні рядки після очищення?
+    if (df['distributor'] == '').all():
+        print("Попередження: Колонка 'distributor' не містить значущих даних. Повертаю порожній DataFrame.")
+        return pd.DataFrame(
+            columns=['distributor', 'product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity', 'new_client'])
+
+    # Крок 1: Агрегуємо quantity за всіма ключовими полями, включаючи дистриб'ютора, клієнта та декаду.
+    # Оскільки 'quantity' тепер вважається кумулятивною, ми беремо МАКСИМУМ для кожної групи
+    # (або останнє значення, якщо дані вже відсортовані за часом).
+    # Це гарантує, що для кожної унікальної декади в групі ми отримуємо фінальне кумулятивне значення.
+    aggregated_df = df.groupby(
+        ['distributor', 'product_name', 'full_address', 'year', 'month', 'decade', 'new_client']
+    )['quantity'].max().reset_index() # Змінено .sum() на .max()
+
+    # Крок 2: Сортуємо дані для коректного обчислення "чистих" продажів.
+    # Сортування за декадою є критично важливим.
+    aggregated_df = aggregated_df.sort_values(
+        by=['distributor', 'product_name', 'full_address', 'year', 'month', 'new_client', 'decade']
+    )
+
+    # Крок 3: Обчислюємо кумулятивну суму попередньої декади для віднімання.
+    # Тепер 'quantity' сама по собі є кумулятивною сумою.
+    # Ми просто беремо попереднє значення 'quantity' в межах групи.
+    aggregated_df['prev_decade_quantity'] = aggregated_df.groupby(
+        ['distributor', 'product_name', 'full_address', 'year', 'month', 'new_client']
+    )['quantity'].shift(1).fillna(0)
+
+    # Крок 4: Розраховуємо фактичні продажі за декаду.
+    # Це буде 'quantity' поточної декади мінус 'quantity' попередньої декади.
+    aggregated_df['actual_quantity'] = (
+        aggregated_df['quantity'] - aggregated_df['prev_decade_quantity']
+    )
+
+    # Вибираємо та перейменовуємо потрібні колонки для фінального результату
+    result = aggregated_df[[
+        'distributor', 'product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity', 'new_client'
+    ]]
+
+    # Перетворюємо 'decade' назад у рядок, щоб відповідати очікуваному формату виводу.
+    result['decade'] = result['decade'].astype(str)
+
+    # Фільтруємо записи, де фактична кількість не дорівнює 0.
+    return result[result['actual_quantity'] != 0]
+
+
+# --- Решта ваших оригінальних функцій залишаються без змін ---
+
 def calculate_forecast_with_bootstrap(df_for_current_month: pd.DataFrame, last_decade: int, year: int, month: int,
                                       n_iterations: int = 1000) -> dict:
     """
@@ -97,23 +194,11 @@ def calculate_product_level_forecast(df_for_current_month: pd.DataFrame, workday
 
     # 3. Розраховуємо прогноз до кінця місяця для кожного продукту
     product_summary['forecast_quantity'] = product_summary['quantity_so_far'] + (
-                product_summary['daily_quantity_rate'] * workdays_left)
+            product_summary['daily_quantity_rate'] * workdays_left)
     product_summary['forecast_revenue'] = product_summary['revenue_so_far'] + (
-                product_summary['daily_revenue_rate'] * workdays_left)
+            product_summary['daily_revenue_rate'] * workdays_left)
 
     return product_summary.sort_values(by='forecast_revenue', ascending=False)
-
-
-# --- Існуючі функції без змін ---
-def create_full_address(df: pd.DataFrame) -> pd.DataFrame:
-    """Створює єдину колонку 'full_address' для групування."""
-    if 'full_address' not in df.columns:
-        df['full_address'] = (
-                df['city'].astype(str).fillna('') + ", " +
-                df['street'].astype(str).fillna('') + ", " +
-                df['house_number'].astype(str).fillna('')
-        ).str.strip(' ,')
-    return df
 
 
 def create_address_client_map(df: pd.DataFrame) -> dict:
@@ -159,35 +244,3 @@ def calculate_main_kpis(df: pd.DataFrame) -> dict:
         "top_products": product_sales.head(5),
         "rev_top_products": product_sales.sort_values(ascending=True).head(5)
     }
-
-
-def compute_actual_sales(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Розраховує "чисті" продажі між декадами з виправленою логікою.
-    """
-    if df.empty or 'decade' not in df.columns:
-        return pd.DataFrame(columns=['product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity'])
-
-    df = create_full_address(df)
-    df = df[df['full_address'] != '']
-    group_agg = df.groupby(['product_name', 'full_address', 'year', 'month', 'decade'])['quantity'].sum().reset_index()
-    pivot = group_agg.pivot_table(
-        index=['product_name', 'full_address', 'year', 'month'],
-        columns='decade',
-        values='quantity',
-        fill_value=0
-    )
-    fact_10 = pivot.get('10', 0)
-    fact_20 = (pivot['20'] - pivot.get('10', 0)) if '20' in pivot.columns else 0
-    if '30' in pivot.columns:
-        base_for_30 = pivot.get('20', pivot.get('10', 0))
-        fact_30 = pivot['30'] - base_for_30
-    else:
-        fact_30 = 0
-    pivot['fact_10'] = fact_10
-    pivot['fact_20'] = fact_20
-    pivot['fact_30'] = fact_30
-    result = pivot[['fact_10', 'fact_20', 'fact_30']].stack().reset_index()
-    result.columns = ['product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity']
-    result['decade'] = result['decade'].str.replace('fact_', '')
-    return result[result['actual_quantity'] != 0]
