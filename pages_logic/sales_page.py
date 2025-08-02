@@ -99,8 +99,7 @@ def show():
                     city_product_pivot.sum(axis=1).sort_values(ascending=False).index]
                 st.dataframe(city_product_pivot.style.applymap(
                     lambda val: 'background-color: #4B6F44' if val > 0 else '').format('{:.0f}'))
-                with st.expander("Показати теплову карту продажів"):
-                    visualizations.plot_city_product_heatmap(city_product_pivot)
+
 
     with tab2:
         st.header("Деталізація фактичних замовлень по унікальних адресах")

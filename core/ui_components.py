@@ -14,28 +14,36 @@ def render_local_filters(df: pd.DataFrame, key_prefix: str) -> tuple:
     filter_cols = st.columns(2)
 
     with filter_cols[0]:
-        unique_cities = ["Всі"] + sorted(df['city'].dropna().unique().tolist())
-        selected_city = st.selectbox(
-            "Місто:", unique_cities, key=f"{key_prefix}_city_filter"
+        unique_cities = sorted(df['city'].dropna().unique().tolist())
+        selected_cities = st.multiselect(
+            "Місто:",
+            unique_cities,
+            default=[],
+            key=f"{key_prefix}_city_filter"
         )
 
     with filter_cols[1]:
-        if selected_city != "Всі":
-            streets_in_city = df[df['city'] == selected_city]['street'].dropna().unique()
-            unique_streets = ["Всі"] + sorted(streets_in_city.tolist())
+        # якщо вибрані міста – фільтруємо по них
+        if selected_cities:
+            streets_in_selected_cities = df[df['city'].isin(selected_cities)]['street'].dropna().unique()
+            unique_streets = sorted(streets_in_selected_cities.tolist())
         else:
-            unique_streets = ["Всі"] + sorted(df['street'].dropna().unique().tolist())
-        selected_street = st.selectbox(
-            "Вулиця:", unique_streets, key=f"{key_prefix}_street_filter"
+            # якщо не вибрано жодного міста – показуємо всі вулиці
+            unique_streets = sorted(df['street'].dropna().unique().tolist())
+
+        selected_streets = st.multiselect(
+            "Вулиця:",
+            unique_streets,
+            default=[],
+            key=f"{key_prefix}_street_filter"
         )
 
-    return selected_city, selected_street
+    return selected_cities, selected_streets
 
-def apply_filters(df: pd.DataFrame, city: str, street: str) -> pd.DataFrame:
-    """Застосовує фільтри до DataFrame."""
+def apply_filters(df, cities, streets):
     filtered_df = df.copy()
-    if city != "Всі":
-        filtered_df = filtered_df[filtered_df['city'] == city]
-    if street != "Всі":
-        filtered_df = filtered_df[filtered_df['street'] == street]
+    if cities:  # якщо список не порожній
+        filtered_df = filtered_df[filtered_df['city'].isin(cities)]
+    if streets:
+        filtered_df = filtered_df[filtered_df['street'].isin(streets)]
     return filtered_df
