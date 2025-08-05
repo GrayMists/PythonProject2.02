@@ -44,11 +44,10 @@ def compute_actual_sales(df: pd.DataFrame) -> pd.DataFrame:
     # Примусово видаляємо зайві пробіли з ключових текстових полів.
     text_cols_to_clean = ['distributor', 'product_name', 'city', 'street', 'house_number', 'new_client']
     for col in text_cols_to_clean:
-        if col in df.columns: # Перевіряємо наявність колонки перед очищенням
+        if col in df.columns:
             df[col] = df[col].fillna('').astype(str).str.strip()
 
     # Створення повної адреси відбувається ПІСЛЯ очищення її компонентів
-    # Використовуємо вашу оригінальну функцію create_full_address
     df = create_full_address(df)
     df = df[df['full_address'] != '']
     # Перетворюємо 'decade' на числовий тип для коректного сортування
@@ -60,29 +59,26 @@ def compute_actual_sales(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(
             columns=['distributor', 'product_name', 'full_address', 'year', 'month', 'decade', 'actual_quantity', 'new_client'])
 
-    # Крок 1: Агрегуємо quantity за всіма ключовими полями, включаючи дистриб'ютора, клієнта та декаду.
-    # Оскільки 'quantity' тепер вважається кумулятивною, ми беремо МАКСИМУМ для кожної групи
-    # (або останнє значення, якщо дані вже відсортовані за часом).
-    # Це гарантує, що для кожної унікальної декади в групі ми отримуємо фінальне кумулятивне значення.
-    aggregated_df = df.groupby(
-        ['distributor', 'product_name', 'full_address', 'year', 'month', 'decade', 'new_client']
-    )['quantity'].max().reset_index() # Змінено .sum() на .max()
+    # КРОК: Агрегуємо продажі в межах декади (сума всіх замовлень в декаді)
+    df = df.groupby(
+        ['distributor', 'product_name', 'full_address', 'year', 'month', 'decade', 'new_client'],
+        as_index=False
+    )['quantity'].sum()
+
+    # Тепер aggregated_df — це просто df після агрегації
+    aggregated_df = df
 
     # Крок 2: Сортуємо дані для коректного обчислення "чистих" продажів.
-    # Сортування за декадою є критично важливим.
     aggregated_df = aggregated_df.sort_values(
         by=['distributor', 'product_name', 'full_address', 'year', 'month', 'new_client', 'decade']
     )
 
     # Крок 3: Обчислюємо кумулятивну суму попередньої декади для віднімання.
-    # Тепер 'quantity' сама по собі є кумулятивною сумою.
-    # Ми просто беремо попереднє значення 'quantity' в межах групи.
     aggregated_df['prev_decade_quantity'] = aggregated_df.groupby(
         ['distributor', 'product_name', 'full_address', 'year', 'month', 'new_client']
     )['quantity'].shift(1).fillna(0)
 
     # Крок 4: Розраховуємо фактичні продажі за декаду.
-    # Це буде 'quantity' поточної декади мінус 'quantity' попередньої декади.
     aggregated_df['actual_quantity'] = (
         aggregated_df['quantity'] - aggregated_df['prev_decade_quantity']
     )

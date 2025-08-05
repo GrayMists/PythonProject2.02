@@ -109,6 +109,8 @@ def show():
         with st.spinner("Розрахунок фактичних продажів..."):
             if not df_display_client_filtered.empty:
                 df_actual_sales = data_processing.compute_actual_sales(df_display_client_filtered.copy())
+                # Фільтруємо лише фактичні продажі (>0)
+                df_actual_sales = df_actual_sales[df_actual_sales['actual_quantity'] > 0]
                 # --- Кінець секції відладки ---
             else:
                 df_actual_sales = pd.DataFrame()
