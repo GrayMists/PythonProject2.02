@@ -206,7 +206,7 @@ def create_address_client_map(df: pd.DataFrame) -> dict:
     address_map = (
         df.groupby('full_address')['new_client']
         .unique()
-        .apply(lambda x: ', '.join(sorted(x)))
+        .apply(lambda x: ', '.join(sorted(x.dropna().astype(str))))
         .to_dict()
     )
     return address_map
