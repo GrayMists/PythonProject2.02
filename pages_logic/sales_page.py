@@ -97,7 +97,7 @@ def show():
             if not city_product_pivot.empty:
                 city_product_pivot = city_product_pivot.loc[
                     city_product_pivot.sum(axis=1).sort_values(ascending=False).index]
-                st.dataframe(city_product_pivot.style.applymap(
+                st.dataframe(city_product_pivot..style.map(
                     lambda val: 'background-color: #4B6F44' if val > 0 else '').format('{:.0f}'))
 
 
