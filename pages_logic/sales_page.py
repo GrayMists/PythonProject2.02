@@ -83,6 +83,7 @@ def show():
             kpi_cols[1].metric("Унікальні продукти", f"{kpis['unique_products']:,}")
             kpi_cols[2].metric("Унікальні клієнти", f"{kpis['unique_clients']:,}")
             kpi_cols[3].metric("Частка ТОП-5 (%)", f"{kpis['top5_share']:.1f}%")
+            
             total_revenue_fact = df_latest_decade.merge(price_df_full, on=['product_name', 'month'], how='left')
             total_revenue_fact['revenue'] = total_revenue_fact['quantity'] * total_revenue_fact['price']
             fact_revenue_sum = total_revenue_fact['revenue'].sum() if 'revenue' in total_revenue_fact.columns else 0
@@ -100,7 +101,6 @@ def show():
                 st.dataframe(city_product_pivot.style.map(
                     lambda val: 'background-color: #4B6F44' if val > 0 else '').format('{:.0f}'))
 
-
     with tab2:
         st.header("Деталізація фактичних замовлень по унікальних адресах")
         city_client, street_client = ui_components.render_local_filters(df_full, key_prefix="tab2")
@@ -109,9 +109,7 @@ def show():
         with st.spinner("Розрахунок фактичних продажів..."):
             if not df_display_client_filtered.empty:
                 df_actual_sales = data_processing.compute_actual_sales(df_display_client_filtered.copy())
-                # Фільтруємо лише фактичні продажі (>0)
                 df_actual_sales = df_actual_sales[df_actual_sales['actual_quantity'] > 0]
-                # --- Кінець секції відладки ---
             else:
                 df_actual_sales = pd.DataFrame()
 
@@ -136,7 +134,7 @@ def show():
                     st.metric("Всього фактичних продажів за адресою:", f"{group['actual_quantity'].sum():,}")
                     pivot_table = group.pivot_table(index='product_name', columns=['year', 'month', 'decade'],
                                                     values='actual_quantity', aggfunc='sum', fill_value=0)
-                   st.dataframe(pivot_table.style.map(highlight_positive_dark_green).format('{:.0f}'))
+                    st.dataframe(pivot_table.style.map(highlight_positive_dark_green).format('{:.0f}'))
 
     with tab3:
         st.header(f"Аналіз доходу за останню декаду ({max_decade if max_decade else 'N/A'})")
@@ -160,8 +158,7 @@ def show():
                     st.error("Не вдалося завантажити дані про ціни для обраних місяців. Розрахунок доходу неможливий.")
                 else:
                     sales_df_for_merge = df_latest_decade.copy()
-                    sales_df_for_merge['month'] = pd.to_numeric(sales_df_for_merge['month'], errors='coerce').astype(
-                        'Int64')
+                    sales_df_for_merge['month'] = pd.to_numeric(sales_df_for_merge['month'], errors='coerce').astype('Int64')
                     merged_df = pd.merge(sales_df_for_merge, price_df, on=['product_name', 'month'], how='left')
                     products_no_price = merged_df[merged_df['price'].isnull()]['product_name'].unique()
 
@@ -261,14 +258,10 @@ def show():
                                     product_forecast_df,
                                     column_config={
                                         "product_name": st.column_config.TextColumn("Продукт"),
-                                        "quantity_so_far": st.column_config.NumberColumn("Факт (к-сть)",
-                                                                                         format="%d уп."),
-                                        "forecast_quantity": st.column_config.NumberColumn("Прогноз (к-сть)",
-                                                                                           format="%.1f уп."),
-                                        "revenue_so_far": st.column_config.NumberColumn("Факт (дохід)",
-                                                                                        format="%.2f грн"),
-                                        "forecast_revenue": st.column_config.NumberColumn("Прогноз (дохід)",
-                                                                                          format="%.2f грн"),
+                                        "quantity_so_far": st.column_config.NumberColumn("Факт (к-сть)", format="%d уп."),
+                                        "forecast_quantity": st.column_config.NumberColumn("Прогноз (к-сть)", format="%.1f уп."),
+                                        "revenue_so_far": st.column_config.NumberColumn("Факт (дохід)", format="%.2f грн"),
+                                        "forecast_revenue": st.column_config.NumberColumn("Прогноз (дохід)", format="%.2f грн"),
                                         "daily_quantity_rate": None,
                                         "daily_revenue_rate": None,
                                     },
