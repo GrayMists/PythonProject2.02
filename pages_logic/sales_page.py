@@ -97,7 +97,7 @@ def show():
             if not city_product_pivot.empty:
                 city_product_pivot = city_product_pivot.loc[
                     city_product_pivot.sum(axis=1).sort_values(ascending=False).index]
-                st.dataframe(city_product_pivot..style.map(
+                st.dataframe(city_product_pivot.style.map(
                     lambda val: 'background-color: #4B6F44' if val > 0 else '').format('{:.0f}'))
 
 
@@ -124,7 +124,7 @@ def show():
             st.subheader("Загальна зведена таблиця по фактичних продажах")
             summary_pivot_table = df_actual_sales.pivot_table(index='product_name', columns=['year', 'month', 'decade'],
                                                               values='actual_quantity', aggfunc='sum', fill_value=0)
-            st.dataframe(summary_pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))
+            st.dataframe(summary_pivot_table.style.map(highlight_positive_dark_green).format('{:.0f}'))
             st.markdown("---")
 
             grouped = df_actual_sales.groupby(['full_address', 'new_client'])
@@ -136,7 +136,7 @@ def show():
                     st.metric("Всього фактичних продажів за адресою:", f"{group['actual_quantity'].sum():,}")
                     pivot_table = group.pivot_table(index='product_name', columns=['year', 'month', 'decade'],
                                                     values='actual_quantity', aggfunc='sum', fill_value=0)
-                    st.dataframe(pivot_table.style.applymap(highlight_positive_dark_green).format('{:.0f}'))
+                   st.dataframe(pivot_table.style.map(highlight_positive_dark_green).format('{:.0f}'))
 
     with tab3:
         st.header(f"Аналіз доходу за останню декаду ({max_decade if max_decade else 'N/A'})")
