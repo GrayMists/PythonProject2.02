@@ -203,7 +203,7 @@ def show():
 
                     final_upload_df = upload_df[[col for col in columns_to_upload if col in upload_df.columns]]
                     # Замінюємо NaN на None, що є еквівалентом NULL в базі даних
-                    final_upload_df = final_upload_df.where(pd.notna(final_upload_df), None)
+                    final_upload_df = final_upload_df.astype(object).where(pd.notna(final_upload_df), None)
                     data_to_insert = final_upload_df.to_dict(orient='records')
 
                     # Виконуємо вставку даних
